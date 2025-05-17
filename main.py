@@ -35,42 +35,106 @@ prev_elections = (
 default_parties = ["PSD", "PS", "CH", "IL", "BE", "PCP", "L", "PAN", "Outros"]
 votes_pct_adjusted = calculate_adjusted_percentages(prev_elections, default_parties)
 
-with st.form("input_form"):    
-    # Organize inputs in a wider grid
-    percentages = {}
-    num_cols = 5
-    for i in range(0, len(default_parties), num_cols):
-        cols = st.columns(num_cols)
-        for j, party in enumerate(default_parties[i:i + num_cols]):
-            if j < len(default_parties[i:i + num_cols]):
-                with cols[j]:
-                    default_value = float(votes_pct_adjusted[party])
-                    help_text = "Outros partidos + Votos em branco + Votos nulos" if party == "Outros" else None
-                    percentages[party] = st.number_input(
-                        f"{party}",
-                        min_value=0.0,
-                        max_value=100.0,
-                        value=default_value,
-                        step=0.1,
-                        format="%.1f",
-                        help=help_text,
-                        key=f"input_{party}"
-                    )
+# Function to handle automatic adjustments
+def adjust_other_parties(changed_party, new_value, old_values):
+    """Update party percentages while maintaining 100% total."""
+    new_values = old_values.copy()
+    new_value = round(new_value, 1)  # Ensure new value is rounded
+    new_values[changed_party] = new_value
     
-    # Total and submit in the same row
-    col_total, col_submit = st.columns([4, 1])
-    with col_total:
-        total_percent = round(sum(percentages.values()), 1)
-        msg = f"Total: {total_percent}%"
-        if total_percent == 100.0:
-            st.success(msg)
-        else:
-            st.error(msg)
+    # Calculate how much we need to adjust
+    delta = new_value - old_values[changed_party]
     
-    with col_submit:
-        submit = st.form_submit_button("Calcular")
-        if not submit and total_percent != 100.0:
-            st.stop()
+    if abs(delta) > 0.001:  # Only adjust if there's a meaningful change
+        # Get sum of other parties (excluding the changed one)
+        other_parties = [p for p in old_values.keys() if p != changed_party]
+        other_sum = sum(old_values[p] for p in other_parties)
+        
+        if other_sum > 0:  # Only adjust if there's something to adjust
+            # Adjust proportionally
+            for party in other_parties:
+                proportion = old_values[party] / other_sum
+                adjustment = delta * proportion
+                # For increases we subtract, for decreases we add
+                new_values[party] = round(old_values[party] - adjustment, 1)
+                new_values[party] = max(0, new_values[party])  # Ensure no negative values
+    
+    # Final adjustment to ensure exactly 100%
+    total = sum(new_values.values())
+    if total != 100:
+        # Add/subtract the difference from the largest party that's not the changed one
+        largest_party = max((p for p in other_parties), key=lambda p: new_values[p])
+        new_values[largest_party] = round(new_values[largest_party] + (100 - total), 1)
+    
+    return new_values
+
+# Initialize session state
+if 'percentages' not in st.session_state:
+    st.session_state.percentages = {p: round(float(votes_pct_adjusted[p]), 1) for p in default_parties}
+
+def handle_input_change():
+    """Call this function when any input changes"""
+    # Find which input changed by comparing with session state
+    for party in default_parties:
+        if f"input_{party}" in st.session_state:
+            new_value = round(st.session_state[f"input_{party}"], 1)
+            if abs(new_value - st.session_state.percentages[party]) >= 0.1:
+                st.session_state.percentages = adjust_other_parties(party, new_value, st.session_state.percentages)
+                break
+
+def reset_values():
+    """Reset all values to initial state"""
+    st.session_state.percentages = {p: round(float(votes_pct_adjusted[p]), 1) for p in default_parties}
+    st.experimental_rerun()
+
+# Organize inputs in a tight grid - first row
+cols = st.columns([1, 1, 1, 1, 1, 1])
+percentages = {}
+
+# First row
+for i, party in enumerate(default_parties[:6]):
+    with cols[i]:
+        help_text = "Outros partidos + Votos em branco + Votos nulos" if party == "Outros" else None
+        st.number_input(
+            f"{party}",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(st.session_state.percentages[party]),
+            step=0.1,
+            format="%.1f",
+            key=f"input_{party}",
+            on_change=handle_input_change,
+            help=help_text,
+            label_visibility="visible"
+        )
+        percentages[party] = st.session_state.percentages[party]
+
+# Second row
+cols2 = st.columns([1, 1, 1, 1, 1, 1])
+
+# Handle remaining parties
+for i, party in enumerate(default_parties[6:]):
+    with cols2[i]:
+        help_text = "Outros partidos + Votos em branco + Votos nulos" if party == "Outros" else None
+        st.number_input(
+            f"{party}",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(st.session_state.percentages[party]),
+            step=0.1,
+            format="%.1f",
+            key=f"input_{party}",
+            on_change=handle_input_change,
+            help=help_text,
+            label_visibility="visible"
+        )
+        percentages[party] = st.session_state.percentages[party]
+
+# Add reset button in the 4th column
+with cols2[3]:
+    st.write("")  # Add some spacing
+    if st.button("Reset", key="reset_button"):
+        reset_values()
 
 # Results section
 elections_df = prev_elections.astype(float)
@@ -91,19 +155,28 @@ col_barplot, col_blocks = st.columns(2)
 
 with col_barplot:
     plot_df = results_df.copy()
+    plot_df = plot_df[plot_df.index != 'Outros']
     fig = {
         'data': [{
             'x': plot_df.index,
             'y': plot_df['Mandatos'],
             'type': 'bar',
             'marker': {
-                'color': ['#FF7F00', '#FF0000', '#18375F', '#0066FF', '#BE0026', '#C90A1E', '#00FFA3', '#33CC33', '#999999']
+                'color': ['#FF7F00', '#FF0000', '#18375F', '#0066FF', '#BE0026', '#C90A1E', '#00FFA3', '#33CC33']
             },
             'text': plot_df['Mandatos'],
-            'textposition': 'auto',
+            'textposition': 'outside',
+            'textfont': {'size': 16},
         }],
         'layout': {
-            'yaxis': {'title': 'Número de deputados'},
+            'yaxis': {
+                'title': 'Deputados',
+                'title_font': {'size': 18},
+                'tickfont': {'size': 14}
+            },
+            'xaxis': {
+                'tickfont': {'size': 14}
+            },
             'height': 400,
             'margin': {'t': 20}
         }
@@ -159,9 +232,8 @@ with col_blocks:
                 'x0': 115,
                 'x1': 115,
                 'y0': -0.5,
-                'y1': 0.5,
-                'line': {
-                    'color': '#FFA500',
+                'y1': 0.5,                'line': {
+                    'color': '#FF4500',
                     'width': 3,
                     'dash': 'dashdot'
                 }            }],            'annotations': [{
@@ -169,7 +241,7 @@ with col_blocks:
                 'y': 0.8,
                 'text': '<b>Maioria (115)</b>',
                 'showarrow': False,
-                'font': {'size': 14, 'color': '#FFA500'},
+                'font': {'size': 14, 'color': '#FF4500'},
                 'yanchor': 'bottom'
             }],
             'bargap': 0,
@@ -188,8 +260,7 @@ with col_blocks:
         st.success(f"🔹 Esquerda tem maioria absoluta (+{left_block - majority_seats} deputados)")
     else:
         st.info(
-            f"**Cenários possíveis:**\n"
-            f"🔸 Direita (AD+IL): {right_block} deputados\n"
-            f"🔸 CH: {ch_block} deputados\n"
-            f"🔸 Esquerda (PS+BE+PCP+L+PAN): {left_block} deputados"
+            f"🔸 Esquerda (PS+BE+PCP+L+PAN): {left_block} deputados\n\n"
+            f"🔸 CH: {ch_block} deputados\n\n"
+            f"🔸 Direita (AD+IL): {right_block} deputados\n\n"
         )
