@@ -22,7 +22,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("## Simulador Legislativas 2025")
+st.markdown("## Simulador Legislativas 2025 🗳")
 prev_elections_raw = pd.read_csv('2024.csv', sep=';')
 prev_elections = (
     prev_elections_raw
@@ -207,19 +207,20 @@ with col_blocks:
         party_data.append({
             'name': party,
             'x': [seats],
-            'y': [''],
-            'orientation': 'h',
+            'y': [''],            'orientation': 'h',
             'type': 'bar',
-            'text': str(seats),
-            'textposition': 'auto',
+            'text': [f"{party} ({seats})"],
+            'textposition': 'inside',
             'marker': {'color': party_colors[party]},
-            'hovertemplate': party + ': %{x} deputados<extra></extra>'        })
+            'showlegend': False,
+            'textfont': {'color': 'white', 'size': 14},
+            'hovertemplate': party + ': %{x} deputados<extra></extra>'})
     
     fig_blocks = {
-        'data': party_data,
-        'layout': {
+        'data': party_data,        'layout': {
             'barmode': 'stack',
-            'showlegend': False,            'xaxis': {
+            'showlegend': False,
+            'xaxis': {
                 'range': [0, 230],
                 'showgrid': False,
                 'showticklabels': False,
@@ -227,7 +228,16 @@ with col_blocks:
             },
             'yaxis': {
                 'showticklabels': False
-            },            'shapes': [{
+            },
+            'legend': {
+                'x': 1.02,
+                'y': 0.5,
+                'xanchor': 'left',
+                'yanchor': 'middle',
+                'font': {'size': 14},
+                'itemwidth': 30
+            },
+            'shapes': [{
                 'type': 'line',
                 'x0': 115,
                 'x1': 115,
@@ -247,7 +257,7 @@ with col_blocks:
             'bargap': 0,
             'bargroupgap': 0,
             'height': 120,
-            'margin': {'l': 20, 'r': 20, 't': 10, 'b': 10}
+            'margin': {'l': 20, 'r': 20, 't': 10, 'b': 30}
         }
     }
     st.plotly_chart(fig_blocks, use_container_width=True)
