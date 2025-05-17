@@ -26,28 +26,44 @@ def calcular_percentagens_ajustadas(votos_prev, default_parties):
     votos_pct_adjusted["Outros"] = round(100 - votos_pct_adjusted[:-1].sum(), 1)
     return votos_pct_adjusted
 
-def calcular_indices_regionais(elections_df, default_parties):
-    votos_pct_regional = pd.DataFrame(0.0, index=default_parties, columns=elections_df.columns)
+def calcular_proporcoes_regionais(elections_df, default_parties):
+    """
+    Calcula a proporção de votos por região dentro de cada partido.
+    """
+    proporcoes = pd.DataFrame(0.0, index=default_parties, columns=elections_df.columns)
+    
     for party in default_parties:
         if party == "Outros":
-            outros_votos = elections_df.loc[~elections_df.index.isin(default_parties[:-1])]
-            votos_pct_regional.loc[party] = outros_votos.sum() / elections_df.sum()
+            outros_votos = elections_df.loc[~elections_df.index.isin(default_parties[:-1])].sum()
+            total_outros = outros_votos.sum()
+            proporcoes.loc[party] = outros_votos / total_outros if total_outros > 0 else 1.0 / len(elections_df.columns)
         elif party in elections_df.index:
-            votos_pct_regional.loc[party] = elections_df.loc[party] / elections_df.sum()
+            votos = elections_df.loc[party]
+            total = votos.sum()
+            proporcoes.loc[party] = votos / total if total > 0 else 1.0 / len(elections_df.columns)
         else:
-            votos_pct_regional.loc[party] = 1.0 / len(elections_df.columns)
-    votos_nacional = votos_pct_regional.mean(axis=1)
-    return votos_pct_regional.div(votos_nacional, axis=0).fillna(1.0)
+            proporcoes.loc[party] = 1.0 / len(elections_df.columns)
 
-def simular_votos(percentages, indices_regionais, elections_df, default_parties):
+    return proporcoes.fillna(0.0)
+
+def simular_votos_nacional(percentages, proporcoes_regionais, elections_df, default_parties):
+    """
+    Simula os votos por círculo, ajustando os totais nacionais e respeitando a distribuição regional.
+    """
+    total_votos = elections_df.sum().sum()
+
+    # Calcular total de votos desejado por partido
+    votos_por_partido = {
+        p: (percentages.get(p, 0) / 100) * total_votos
+        for p in default_parties
+    }
+
     simulated_votes = pd.DataFrame(0.0, index=default_parties, columns=elections_df.columns)
-    for circle in elections_df.columns:
-        total_votes = elections_df[circle].sum()
-        pct_ajustadas = {p: percentages[p] * indices_regionais.at[p, circle] for p in default_parties}
-        soma = sum(pct_ajustadas.values())
-        pct_normalizadas = {p: v/soma for p, v in pct_ajustadas.items()}
-        for p in default_parties:
-            simulated_votes.at[p, circle] = total_votes * pct_normalizadas[p]
+
+    for p in default_parties:
+        distrib = proporcoes_regionais.loc[p]
+        simulated_votes.loc[p] = distrib * votos_por_partido[p]
+
     return simulated_votes
 
 def calcular_resultados_finais(simulated_votes, default_parties):

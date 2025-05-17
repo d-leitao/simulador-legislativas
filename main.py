@@ -4,8 +4,8 @@ import numpy as np
 
 from calc import (
     calcular_percentagens_ajustadas,
-    calcular_indices_regionais,
-    simular_votos,
+    calcular_proporcoes_regionais,
+    simular_votos_nacional,
     calcular_resultados_finais
 )
 
@@ -21,16 +21,17 @@ st.markdown("""
 
 st.markdown("## Simulador Legislativas 2025")
 
-voto = pd.read_csv('2024.csv', sep=';')
-votos_prev = (
-    voto.replace("c.r.", "0")
-        .replace("-", "0")
-        .set_index('Partido')
-        .astype(float)
+last_elections_raw = pd.read_csv('2024.csv', sep=';')
+last_elections = (
+    last_elections_raw
+    .replace("c.r.", "0")
+    .replace("-", "0")
+    .set_index('Partido')
+    .astype(float)
 )
 
 default_parties = ["PSD", "PS", "CH", "IL", "BE", "PCP", "L", "PAN", "Outros"]
-votos_pct_adjusted = calcular_percentagens_ajustadas(votos_prev, default_parties)
+votos_pct_adjusted = calcular_percentagens_ajustadas(last_elections, default_parties)
 
 percentages = {}
 num_columns = 5
@@ -51,7 +52,7 @@ for row in rows:
 
 with st.sidebar:
     st.markdown("### Opções")
-    if st.button("↺ Reset para valores anteriores", help="Reverter para resultados da última eleição"):
+    if st.button("↺ Reset", help="Reverter para resultados da última eleição"):
         st.session_state.clear()
         st.rerun()
 
@@ -64,9 +65,9 @@ else:
     st.sidebar.warning(msg)
     st.stop()
 
-elections_df = votos_prev.astype(float)
-indices_regionais = calcular_indices_regionais(elections_df, default_parties)
-simulated_votes = simular_votos(percentages, indices_regionais, elections_df, default_parties)
+elections_df = last_elections.astype(float)
+proporcoes_regionais = calcular_proporcoes_regionais(elections_df, default_parties)
+simulated_votes = simular_votos_nacional(percentages, proporcoes_regionais, elections_df, default_parties)
 final_results, circle_results = calcular_resultados_finais(simulated_votes, default_parties)
 
 results_df = pd.DataFrame.from_dict(final_results, orient='index', columns=['Mandatos']).sort_values('Mandatos', ascending=False)
