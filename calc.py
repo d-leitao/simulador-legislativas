@@ -17,63 +17,63 @@ def hondt_method(votes, seats):
         results[party] += 1
     return results
 
-def calcular_percentagens_ajustadas(votos_prev, default_parties):
-    votos_sum = votos_prev.sum(axis=1)
-    votos_pct = (votos_sum / votos_sum.sum() * 100).round(1)
-    votos_pct_adjusted = pd.Series(0.0, index=default_parties)
+def calculate_adjusted_percentages(prev_votes, default_parties):
+    votes_sum = prev_votes.sum(axis=1)
+    votes_pct = (votes_sum / votes_sum.sum() * 100).round(1)
+    votes_pct_adjusted = pd.Series(0.0, index=default_parties)
     for party in default_parties[:-1]:
-        votos_pct_adjusted[party] = round(votos_pct.get(party, 0.0), 1)
-    votos_pct_adjusted["Outros"] = round(100 - votos_pct_adjusted[:-1].sum(), 1)
-    return votos_pct_adjusted
+        votes_pct_adjusted[party] = round(votes_pct.get(party, 0.0), 1)
+    votes_pct_adjusted["Outros"] = round(100 - votes_pct_adjusted[:-1].sum(), 1)
+    return votes_pct_adjusted
 
-def calcular_proporcoes_regionais(elections_df, default_parties):
+def calculate_regional_proportions(elections_df, default_parties):
     """
-    Calcula a proporção de votos por região dentro de cada partido.
+    Calculate the proportion of votes per region within each party.
     """
-    proporcoes = pd.DataFrame(0.0, index=default_parties, columns=elections_df.columns)
+    proportions = pd.DataFrame(0.0, index=default_parties, columns=elections_df.columns)
     
     for party in default_parties:
         if party == "Outros":
-            outros_votos = elections_df.loc[~elections_df.index.isin(default_parties[:-1])].sum()
-            total_outros = outros_votos.sum()
-            proporcoes.loc[party] = outros_votos / total_outros if total_outros > 0 else 1.0 / len(elections_df.columns)
+            other_votes = elections_df.loc[~elections_df.index.isin(default_parties[:-1])].sum()
+            total_other = other_votes.sum()
+            proportions.loc[party] = other_votes / total_other if total_other > 0 else 1.0 / len(elections_df.columns)
         elif party in elections_df.index:
-            votos = elections_df.loc[party]
-            total = votos.sum()
-            proporcoes.loc[party] = votos / total if total > 0 else 1.0 / len(elections_df.columns)
+            votes = elections_df.loc[party]
+            total = votes.sum()
+            proportions.loc[party] = votes / total if total > 0 else 1.0 / len(elections_df.columns)
         else:
-            proporcoes.loc[party] = 1.0 / len(elections_df.columns)
+            proportions.loc[party] = 1.0 / len(elections_df.columns)
 
-    return proporcoes.fillna(0.0)
+    return proportions.fillna(0.0)
 
-def simular_votos_nacional(percentages, proporcoes_regionais, elections_df, default_parties):
+def simulate_national_votes(percentages, regional_proportions, elections_df, default_parties):
     """
-    Simula os votos por círculo, ajustando os totais nacionais e respeitando a distribuição regional.
+    Simulate votes per district, adjusting national totals while respecting regional distribution.
     """
-    total_votos = elections_df.sum().sum()
+    total_votes = elections_df.sum().sum()
 
-    # Calcular total de votos desejado por partido
-    votos_por_partido = {
-        p: (percentages.get(p, 0) / 100) * total_votos
+    # Calculate desired total votes per party
+    votes_per_party = {
+        p: (percentages.get(p, 0) / 100) * total_votes
         for p in default_parties
     }
 
     simulated_votes = pd.DataFrame(0.0, index=default_parties, columns=elections_df.columns)
 
     for p in default_parties:
-        distrib = proporcoes_regionais.loc[p]
-        simulated_votes.loc[p] = distrib * votos_por_partido[p]
+        distrib = regional_proportions.loc[p]
+        simulated_votes.loc[p] = distrib * votes_per_party[p]
 
     return simulated_votes
 
-def calcular_resultados_finais(simulated_votes, default_parties):
+def calculate_final_results(simulated_votes, default_parties):
     final_results = {p: 0 for p in default_parties}
-    circle_results = {}
-    for circle in simulated_votes.columns:
-        votes_circle = {p: simulated_votes.at[p, circle] for p in default_parties if p != "Outros"}
-        result = hondt_method(votes_circle, seats_per_circle[circle])
-        circle_results[circle] = result
+    district_results = {}
+    for district in simulated_votes.columns:
+        votes_district = {p: simulated_votes.at[p, district] for p in default_parties if p != "Outros"}
+        result = hondt_method(votes_district, seats_per_circle[district])
+        district_results[district] = result
         for p, s in result.items():
             final_results[p] += s
     final_results["Outros"] = 0
-    return final_results, circle_results
+    return final_results, district_results
