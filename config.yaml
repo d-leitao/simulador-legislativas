@@ -1,0 +1,42 @@
+title: "## Simulador Legislativas 2025 🗳"
+
+# Lista completa de partidos para o cálculo
+default_parties:
+  - PSD
+  - PS 
+  - CH
+  - IL
+  - BE 
+  - PCP
+  - L
+  - PAN
+  - Outros
+
+# Votos não partidários (incluídos em "Outros")
+non_party_votes:
+  - Brancos
+  - Nulos
+
+# Número de deputados para maioria absoluta
+majority_seats: 115
+
+# Ordem e cores dos partidos na visualização
+party_visualization:
+  order:
+    - PCP
+    - BE
+    - L
+    - PS
+    - PAN
+    - CH
+    - PSD
+    - IL
+  colors:
+    PCP: '#C90A1E'
+    BE: '#BE0026'
+    L: '#00FFA3'
+    PS: '#FF0000'
+    PAN: '#33CC33'
+    CH: '#18375F'
+    PSD: '#FF7F00'
+    IL: '#0066FF'
