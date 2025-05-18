@@ -1,4 +1,5 @@
 title: "## Simulador Legislativas 2025 🗳"
+input_columns: 6
 
 # Lista completa de partidos para o cálculo
 default_parties:
